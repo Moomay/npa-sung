@@ -46,6 +46,12 @@ def requests_info(config_command):
         result = ssh.send_command(config_command)
     return result.split('\n')
 
+def send_config(config_set):
+    with ConnectHandler(**device_params) as ssh:
+        ssh.send_config_set(config_set)
+        result = ssh.send_command('sh ip int b')
+    return result.split('\n')
+
 @app.get("/")
 async def root():
     return {"message": "Rest API"}
@@ -78,6 +84,12 @@ async def get_interfaces(int_id: int):
             ]
             print(info)
             return info
+
+
+@app.post("/loopback/{lo_num}/{addr}")
+async def create_loopback(lo_num: int, addr: str):
+    response = send_config(['int lo'+str(lo_num), 'ip add '+addr])
+    return response
 
 # @app.get("/book/{book_id}")
 # async def get_books(book_id: int):
