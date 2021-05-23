@@ -3,6 +3,8 @@ from pydantic import BaseModel # New import
 from typing import List
 from starlette.responses import Response
 from netmiko import ConnectHandler
+from ntc_templates.parse import parse_output
+from ipaddress import *
 import json
 
 app = FastAPI()
@@ -16,29 +18,6 @@ device_params = {'device_type': 'cisco_ios',
                   'password': password,
                 }
 
-# New
-book_db = [
-    {
-        "title":"The C Programming",
-        "price": 720
-    },
-    {
-        "title":"Learn Python the Hard Way",
-        "price": 870
-    },
-    {
-        "title":"JavaScript: The Definitive Guide",
-        "price": 1369
-    },
-    {
-        "title":"Python for Data Analysis",
-        "price": 1394
-    },
-    {
-        "title":"Clean Code",
-        "price": 1500
-    },
-]
 
 
 def requests_info(config_command):
@@ -49,89 +28,56 @@ def requests_info(config_command):
 def send_config(config_set):
     with ConnectHandler(**device_params) as ssh:
         ssh.send_config_set(config_set)
-        result = ssh.send_command('sh ip int b')
-    return result.split('\n')
+    #     result = ssh.send_command(res)
+    # return result.split('\n')
+    
+#----------------------------------------------Find netmask--------------------------------------------------------------
+def netmask(data): 
+    for i in data:
+        if i.find("no ip") != -1:
+            return "unassigned"
+        elif i.find("255") != -1:
+            return i.split()[3]
 
 @app.get("/")
 async def root():
     return {"message": "Rest API"}
 
-@app.get("/book/")
-async def get_books():
-    return book_db
-
+#-----------------------------------------------Show Interfaces-------------------------------------------------
 @app.get("/intrfaces/")
 async def get_interfaces():
-    response = requests_info('sh ip int b')
-    return response
-
-@app.get("/intrface/{int_id}")
-async def get_interfaces(int_id: int):
     interfaces = []
     info = {}
-    netmask = requests_info('sh run int gi'+str(int_id))
-    netmask = netmask[5].split()[3] if len(netmask[5].split()) == 4 else ""  #Get subnet mask
-    int_info = requests_info('sh ip int b')
-    #---------------ต้องแก้ให้รับได้หลาย interface Gig, Se, Lo ตอนนี้ได้แค่ Gig
-    for i in enumerate(int_info):
-        if 'GigabitEthernet'+str(int_id) in i[1]:
-            txt = i[1].split()
-            info['name'] = txt[0]
-            info['enabled'] = txt[4]
-            info['address'] = [
-                {'ip': txt[1],
-                  'netmask': netmask}
-            ]
-            print(info)
-            return info
+    response = requests_info('sh ip int b')
+    for i in response[1:]:
+        i = i.split()
+        print(i)
+        info['name'] = i[0]
+        info['enabled'] = "up" if i[4] == 'up' else "down"
+        info['address'] = {
+            "ip": i[1],
+            "netmask": netmask(requests_info('sh run int '+i[0]))
+        }
+        interfaces.append(info)
+        info = {}
+    return interfaces
 
-
-@app.post("/loopback/{lo_num}/{addr}")
-async def create_loopback(lo_num: int, addr: str):
-    response = send_config(['int lo'+str(lo_num), 'ip add '+addr])
+#-----------------------------------------------Create Loopback------------------------------------------------
+@app.post("/loopback/{loopback_no}/{addr}")
+async def create_loopback(loopback_no: int, addr: str):
+    response = send_config(['int lo'+str(loopback_no), 'ip add '+addr])
     return response
 
-# @app.get("/book/{book_id}")
-# async def get_books(book_id: int):
-#     return book_db[book_id-1]
+
+#-----------------------------------------------Automate Route OSPF--------------------------------------------
+@app.post("/route")
+async def route():
+    cmd = ['router ospf 1']  
+    result = requests_info('sh ip route')
+    for i in result[result.index('')+3:]:
+      if i.split()[0] == 'C':
+        cmd.append('network '+str(IPv4Network(i.split()[1]).network_address)+' '+str(IPv4Address(int(IPv4Address(IPv4Network(i.split()[1]).netmask))^(2**32-1)))+' area 0')
+    send_config(cmd)
+    return 200
 
 
-# ...
-
-# # Model
-# class Book(BaseModel):
-#     title: str
-#     price: float
-
-# ...
-
-# #create new book
-# @app.post("/book")
-# async def create_book(book: Book):
-#     book_db.append(book.dict())
-#     return book_db[-1]
-
-# @app.post("/img")
-# async def up_img_book(file: UploadFile = File(...)):
-#     size = await file.read()
-#     return { "File Name": file.filename, "size": len(size)}
-
-# @app.post("/multi-img")
-# async def up_multi_file(files: List[UploadFile] = File(...)):
-#     file = [
-#         {
-#             "File Name":file.filename, 
-#             "Size":len(await file.read())
-#         } for file in files]
-#     return  file
-
-# @app.put("/book/{book_id}")
-# async def edit_book(book_id: int, book: Book):
-#     result = book.dict()
-#     book_db[book_id-1].update(result)
-#     return result
-
-# @app.delete("/book/{book_id}")
-# async def delete_book(book_id: int):
-#     book = book_db.pop(book_id-1)
-#     return book
