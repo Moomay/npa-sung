@@ -75,20 +75,17 @@ app = FastAPI(routes=routes)
 
 @app.get("/accesslist")
 async def get_accesslist():
-    result = requests_info("sh run | i access")
+    result = requests_info("sh run | i access-list")
     return result
 
 @app.post("/accesslist")
 async def post_access(allAcl: AccessList):
     allAcl = allAcl.dict()
-    haveStdAcl = False
-    haveExtAcl = False
-
     if ("standardAccessList" in allAcl.keys()):
         config_setStd = ["access-list "+str(accl["access_list_number"])+" "+accs["action"]+" "+(accs["ip"])+str("" if accs["wildcard"] == None else " "+str(accs["wildcard"])) for accl in allAcl["standardAccessList"] for accs in accl["access_control_list"]]
-        #send_config(config_setStd)
+        send_config(config_setStd)
     if ("extendAccessList" in allAcl.keys()):
         config_setExt = ["access-list "+str(accl["access_list_number"])+" "+acce["action"]+" "+acce["protocol"]+(" host " if acce["source_wildcard"] == None and acce["source"] != "any" else " ")+acce["source"]+("" if acce["source_wildcard"] == None else " "+acce["source_wildcard"])+("" if acce["form_port"] == None else " eq "+acce["form_port"])+
         (" host " if acce["destination_wildcard"] == None and acce["destination"] != "any" else " ")+acce["destination"]+("" if acce["destination_wildcard"] == None else " "+acce["destination_wildcard"])+("" if acce["to_port"] == None else " eq "+acce["to_port"]) for accl in allAcl["extendAccessList"] for acce in accl["access_control_list"]]
         send_config_set(config_setExt)
-    return config_setExt
+    return config_setStd, config_setExt
