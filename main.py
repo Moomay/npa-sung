@@ -10,6 +10,7 @@ import json
 app = FastAPI()
 
 device_ip = '10.0.15.109'
+# device_ip = ['10.0.15.109', '10.0.15.176', '10.0.15.177']
 username = 'admin'
 password = 'cisco'
 device_params = {'device_type': 'cisco_ios',
@@ -18,7 +19,12 @@ device_params = {'device_type': 'cisco_ios',
                   'password': password,
                 }
 
+class ip_addr(BaseModel):
+    loopback_number: int
+    ip: str
+    netmask: str
 
+    
 
 def requests_info(config_command):
     with ConnectHandler(**device_params) as ssh:
@@ -63,9 +69,11 @@ async def get_interfaces():
     return interfaces
 
 #-----------------------------------------------Create Loopback------------------------------------------------
-@app.post("/loopback/{loopback_no}/{addr}")
-async def create_loopback(loopback_no: int, addr: str):
-    response = send_config(['int lo'+str(loopback_no), 'ip add '+addr])
+
+@app.post("/loopback")
+async def create_loopback(ip:ip_addr):
+    response = send_config(['int lo'+str(ip.dict()['loopback_number']), 'ip add '+ip.dict()['ip']+' '+ip.dict()['netmask']])
+    response = requests_info('sh ip int b')
     return response
 
 
