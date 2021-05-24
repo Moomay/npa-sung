@@ -43,8 +43,8 @@ class AccessList(BaseModel):
 
 class Interface(BaseModel):
     interface: str
-    ip: str
-    subnet: str
+    ip: str #case DHCP
+    subnet: Optional[str] = None
     status: str #up // down
     aclIngress: Optional[int] = None
     aclEgress: Optional[int] = None
@@ -206,7 +206,10 @@ async def set_interface(interfaceList: InterfaceList):
     config_set = []
     for interface in interfaceList["interfaceList"]:
         config_set.append("int "+interface["interface"])
-        config_set.append("ip add "+interface["ip"]+" "+interface["subnet"])
+        if (interface["subnet"] != None):
+            config_set.append("ip add "+interface["ip"]+" "+str(interface["subnet"]))
+        else:
+            config_set.append("ip add "+interface["ip"])
         if (interface["status"] == "up"):
             config_set.append("no shut")
         else:
