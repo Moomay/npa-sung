@@ -1,15 +1,19 @@
 from fastapi import FastAPI, File, UploadFile, Body, Header
-from pydantic import BaseModel # New import
+from pydantic import BaseModel
 from typing import Optional
 from typing import List
-#from starlette.responses import Response
 from starlette.requests import Request
 from starlette.responses import PlainTextResponse, Response
 from starlette.routing import Route
 from netmiko import ConnectHandler
-from urllib.parse import unquote
+from ntc_templates.parse import parse_output
 import json
 import base64
+
+class ip_addr(BaseModel):
+    loopback_number: int
+    ip: str
+    netmask: str
 
 class StandardAccessControl(BaseModel):
     action: str #permit deny
@@ -96,12 +100,68 @@ routes = [
 
 app = FastAPI(routes=routes)
 
+#----------------------------------------------Find netmask--------------------------------------------------------------
+def netmask(data): 
+    for i in data:
+        if i.find("no ip") != -1:
+            return "unassigned"
+        elif i.find("255") != -1:
+            return i.split()[3]
+
+@app.get("/")
+async def root():
+    return {"message": "Rest API"}
+
+#-----------------------------------------------Show Interfaces-------------------------------------------------
+@app.get("/intrfaces/")
+async def get_interfaces(ip: str = Header(None), Authorization: str = Header(None)):
+    device_params = get_device_param(ip, Authorization)
+    interfaces = []
+    info = {}
+    response = requests_info('sh ip int b', device_params)
+    for i in response[1:]:
+        i = i.split()
+        print(i)
+        info['name'] = i[0]
+        info['enabled'] = "up" if i[4] == 'up' else "down"
+        info['address'] = {
+            "ip": i[1],
+            "netmask": netmask(requests_info('sh run int '+i[0], device_params))
+        }
+        interfaces.append(info)
+        info = {}
+    return interfaces
+
+#-----------------------------------------------Create Loopback------------------------------------------------
+
+@app.post("/loopback")
+async def create_loopback(ip_a:ip_addr, ip: str = Header(None), Authorization: str = Header(None)):
+    device_params = get_device_param(ip, Authorization)
+    response = send_config(['int lo'+str(ip_a.dict()['loopback_number']), 'ip add '+ip_a.dict()['ip']+' '+ip_a.dict()['netmask']])
+    response = requests_info('sh ip int b', device_params)
+    return response
+
+
+#-----------------------------------------------Automate Route OSPF--------------------------------------------
+@app.post("/route")
+async def route(ip: str = Header(None), Authorization: str = Header(None)):
+    device_params = get_device_param(ip, Authorization)
+    cmd = ['router ospf 1']  
+    result = requests_info('sh ip route', device_params)
+    for i in result[result.index('')+3:]:
+      if i.split()[0] == 'C':
+        cmd.append('network '+str(IPv4Network(i.split()[1]).network_address)+' '+str(IPv4Address(int(IPv4Address(IPv4Network(i.split()[1]).netmask))^(2**32-1)))+' area 0')
+    send_config(cmd, device_params)
+    return 200
+
+#-----------------------------------------------Get Access list--------------------------------------------
+
 @app.get("/accesslist")
 async def get_accesslist(ip: str = Header(None), Authorization: str = Header(None)):
     device_params = get_device_param(ip, Authorization)
     result = requests_info("sh run | i access-list", device_params)
     return result
-
+#-----------------------------------------------Config Access list--------------------------------------------
 @app.post("/accesslist")
 async def post_access(allAcl: AccessList, ip: str = Header(None), Authorization: str = Header(None)):
     device_params = get_device_param(ip, Authorization)
@@ -231,4 +291,3 @@ async def set_interface(interfaceList: InterfaceList, ip: str = Header(None), Au
             config_set.append("ip access-group "+str(interface["aclEgress"])+" out")
     send_config(config_set, device_params)
     return config_set
-
