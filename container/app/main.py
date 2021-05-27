@@ -88,17 +88,7 @@ def send_config(config_set, device_params):
     with ConnectHandler(**device_params) as ssh:
         ssh.send_config_set(config_set)
 
-async def get_interface(request):
-    interface = request.path_params['interface']
-    result = requests_info("sh ip int "+interface.replace("=", ""))
-    return PlainTextResponse(str(result))
-
-
-routes = [
-    Route("/interface/{interface:path}", endpoint=get_interface, methods=["GET"]),
-]
-
-app = FastAPI(routes=routes)
+app = FastAPI()
 
 #----------------------------------------------Find netmask--------------------------------------------------------------
 def netmask(data): 
@@ -113,7 +103,7 @@ async def root():
     return {"message": "Rest API"}
 
 #-----------------------------------------------Show Interfaces-------------------------------------------------
-@app.get("/intrfaces/")
+@app.get("/interfaces/")
 async def get_interfaces(ip: str = Header(None), Authorization: str = Header(None)):
     device_params = get_device_param(ip, Authorization)
     interfaces = []
