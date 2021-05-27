@@ -170,7 +170,7 @@ async def post_access(allAcl: AccessList, ip: str = Header(None), Authorization:
         config_setStd = ["access-list "+str(accl["access_list_number"])+" "+accs["action"]+" "+
         (accs["ip"])+str("" if accs["wildcard"] == None else " "+
         str(accs["wildcard"])) for accl in allAcl["standardAccessList"] for accs in accl["access_control_list"]]
-        send_config(config_setStd)
+        send_config(config_setStd, device_params)
     if ("extendAccessList" in allAcl.keys()):
         config_setExt = ["access-list "+str(accl["access_list_number"])+" "+acce["action"]+" "+
         acce["protocol"]+(" host " if acce["source_wildcard"] == None and acce["source"] != "any" else " ")+
@@ -184,7 +184,6 @@ async def post_access(allAcl: AccessList, ip: str = Header(None), Authorization:
 
 @app.post("/accesslist/template")
 async def to_template(config: ConfigsList):
-    device_params = get_device_param(ip, Authorization)
     config = config.dict()
     stdAclNumset = []
     extAclNumset = []
@@ -285,9 +284,9 @@ async def set_interface(interfaceList: InterfaceList, ip: str = Header(None), Au
             config_set.append("no shut")
         else:
             config_set.append("shut")
-        if ("aclIngress" in interface.keys()):
+        if (interface["aclIngress"] != None):
             config_set.append("ip access-group "+str(interface["aclIngress"])+" in")
-        if ("aclEgress" in interface.keys()):
+        if (interface["aclEgress"] != None):
             config_set.append("ip access-group "+str(interface["aclEgress"])+" out")
     send_config(config_set, device_params)
     return config_set
