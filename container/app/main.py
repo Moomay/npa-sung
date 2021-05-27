@@ -128,7 +128,7 @@ async def get_interfaces(ip: str = Header(None), Authorization: str = Header(Non
 @app.post("/loopback")
 async def create_loopback(ip_a:ip_addr, ip: str = Header(None), Authorization: str = Header(None)):
     device_params = get_device_param(ip, Authorization)
-    response = send_config(['int lo'+str(ip_a.dict()['loopback_number']), 'ip add '+ip_a.dict()['ip']+' '+ip_a.dict()['netmask']])
+    response = send_config(['int lo'+str(ip_a.dict()['loopback_number']), 'ip add '+ip_a.dict()['ip']+' '+ip_a.dict()['netmask']], device_params)
     response = requests_info('sh ip int b', device_params)
     return response
 
