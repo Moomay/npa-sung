@@ -37,7 +37,7 @@ data "aws_ami" "aws-linux" {
 
   filter {
     name   = "name"
-    values = ["amzn-ami-hvm*"]
+    values = ["amzn2-ami-hvm*"]
   }
 
   filter {
@@ -113,7 +113,7 @@ resource "aws_security_group" "allow_ssh_web" {
     from_port   = 80
     to_port     = 80
     protocol    = "tcp"
-    cidr_blocks = [var.network_address_space]
+    cidr_blocks = ["0.0.0.0/0"]
   }
   egress {
     from_port   = 0
@@ -137,18 +137,23 @@ resource "aws_instance" "Server1" {
 
   }
 
+  provisioner "remote-exec" {
+    inline = [
+        "sudo yum update -y",
+        "sudo amazon-linux-extras install ansible2 -y",
+        "ls -a",
+        "ls -a"
+    ]
+  }
+
   tags ={
       Name = "NPA21-instance"
   }
 }
 
-resource "aws_s3_bucket" "bucket" {
+resource "aws_s3_bucket" "b" {
   bucket = "fileconfig122"
   acl    = "private"
-
-  versioning {
-    enabled = true
-  }
 
   tags = {
      Name = "NPA21-bucket"
