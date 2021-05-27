@@ -1,0 +1,16 @@
+---
+  - name: createweb
+    hosts: web
+    become: yes
+    become_user: root
+    tasks:
+      - name: install pip
+        yum: name=python3-pip state=installed
+      - name : install fastApi
+        shell: pip3 install fastapi
+      - name : install uvicorn
+        shell: pip3 install uvicorn[standard]
+      - name : install request
+        shell: pip3 install requests
+      - shell: wget https://raw.githubusercontent.com/Moomay/npa-sung/main/web/web.py
+      - shell: uvicorn web:app --host 0.0.0.0 --port 80

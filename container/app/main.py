@@ -6,6 +6,7 @@ from starlette.requests import Request
 from starlette.responses import PlainTextResponse, Response
 from starlette.routing import Route
 from netmiko import ConnectHandler
+from ipaddress import *
 from ntc_templates.parse import parse_output
 import json
 import base64
